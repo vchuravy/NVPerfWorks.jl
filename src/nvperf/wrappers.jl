@@ -241,10 +241,6 @@ function raw(mers::MetricEvalRequestSet; keepInstances=true, isolated=true)
     return reqs
 end
 
-# mutable struct CounterDataBuilder
-#     handle
-# end
-
 abstract type RawMetricsConfig end
 mutable struct CUDARawMetricsConfig <: RawMetricsConfig
     handle::Ptr{NVPA_RawMetricsConfig}
@@ -326,3 +322,61 @@ function config_image(config::RawMetricsConfig)
     end
     return image
 end
+
+import ..CUPTIExt: CounterDataBuilder, prefix
+mutable struct CUDACounterDataBuilder <: CounterDataBuilder
+    handle::Ptr{NVPA_CounterDataBuilder}
+
+    function CUDACounterDataBuilder(chipName, counterAvailability)
+        GC.@preserve chipName counterAvailability begin
+            params = Ref(NVPW_CUDA_CounterDataBuilder_Create_Params(
+                NVPW_CUDA_CounterDataBuilder_Create_Params_STRUCT_SIZE,
+                C_NULL, pointer(chipName), pointer(counterAvailability), C_NULL))
+            NVPW_CUDA_CounterDataBuilder_Create(params)
+            this = new(params[].pCounterDataBuilder)
+        end
+        finalizer(this) do this
+            params = Ref(NVPW_CounterDataBuilder_Destroy_Params(
+                NVPW_CounterDataBuilder_Destroy_Params_STRUCT_SIZE,
+                C_NULL, this.handle))
+            NVPW_CounterDataBuilder_Destroy(params)
+        end
+        return this
+    end
+
+end
+Base.unsafe_convert(::Type{Ptr{NVPA_CounterDataBuilder}}, builder::CUDACounterDataBuilder) = builder.handle
+
+function add!(builder::CounterDataBuilder, metrics::Vector{NVPA_RawMetricRequest})
+    GC.@preserve builder metrics begin
+        params = Ref(NVPW_CounterDataBuilder_AddMetrics_Params(
+            NVPW_CounterDataBuilder_AddMetrics_Params_STRUCT_SIZE,
+            C_NULL, Base.unsafe_convert(Ptr{NVPA_CounterDataBuilder}, builder),
+            pointer(metrics), length(metrics)
+        ))
+        NVPW_CounterDataBuilder_AddMetrics(params)
+    end
+    return nothing
+end
+
+function prefix(builder::CounterDataBuilder)
+    GC.@preserve builder begin
+        params = Ref(NVPW_CounterDataBuilder_GetCounterDataPrefix_Params(
+                    NVPW_CounterDataBuilder_GetCounterDataPrefix_Params_STRUCT_SIZE,
+                    C_NULL, Base.unsafe_convert(Ptr{NVPA_CounterDataBuilder}, builder), 0, C_NULL, 0))
+        NVPW_CounterDataBuilder_GetCounterDataPrefix(params)
+
+        sz = params[].bytesCopied
+    end
+
+    prefix = Vector{UInt8}(undef, sz)
+    GC.@preserve builder prefix begin
+        params = Ref(NVPW_CounterDataBuilder_GetCounterDataPrefix_Params(
+                    NVPW_CounterDataBuilder_GetCounterDataPrefix_Params_STRUCT_SIZE,
+                    C_NULL, Base.unsafe_convert(Ptr{NVPA_CounterDataBuilder}, builder), length(prefix), pointer(prefix), 0))
+        NVPW_CounterDataBuilder_GetCounterDataPrefix(params)
+    end
+    return prefix
+end
+
+

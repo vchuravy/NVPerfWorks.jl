@@ -20,13 +20,20 @@ mer = NVPERF.MetricEvalRequest(me, "dram__bytes.sum.per_second")
 mers = NVPERF.MetricEvalRequestSet(me, [mer])
 raw_metrics = NVPERF.raw(mers)
 
-metricsConfig = NVPERF.CUDARawMetricsConfig(chip, avail; activity=NVPERF.NVPA_ACTIVITY_KIND_REALTIME_PROFILER)
+metricsConfig = NVPERF.CUDARawMetricsConfig(chip, avail)#; activity=NVPERF.NVPA_ACTIVITY_KIND_REALTIME_PROFILER)
 NVPERF.begin_config_group(metricsConfig, 1)
 NVPERF.add!(metricsConfig, raw_metrics)
 NVPERF.end_config_group(metricsConfig)
 NVPERF.generate(metricsConfig)
 
 image = NVPERF.config_image(metricsConfig)
+
+
+builder = NVPERF.CUDACounterDataBuilder(chip, avail)
+NVPERF.add!(builder, raw_metrics)
+prefix = NVPERF.prefix(builder)
+
+counterData = CUPTIExt.CounterData(prefix, 0, 0, 64)
 
 # Need counterDataImage
 # then range then 

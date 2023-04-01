@@ -52,27 +52,28 @@ module CUPTIExt
         scratch::Vector{UInt8}
     end
 
-    function CounterData(builder, maxNumRanges, maxNumRangeTreeNodes, maxRangeNameLength)
-        p = prefix(builder)
-        GC.@preserve p begin
+    function CounterData(prefix, maxNumRanges, maxNumRangeTreeNodes, maxRangeNameLength)
+        GC.@preserve prefix begin
             options = Ref(CUpti_Profiler_CounterDataImageOptions(
                 CUpti_Profiler_CounterDataImageOptions_STRUCT_SIZE,
-                C_NULL, pointer(p), length(p), maxNumRanges, maxNumRangeTreeNodes, maxRangeNameLength))
+                C_NULL, pointer(prefix), length(prefix), maxNumRanges, maxNumRangeTreeNodes, maxRangeNameLength))
 
             GC.@preserve options begin
                 params = Ref(CUpti_Profiler_CounterDataImage_CalculateSize_Params(
                     CUpti_Profiler_CounterDataImage_CalculateSize_Params_STRUCT_SIZE,
-                    C_NULL, CUpti_Profiler_CounterDataImageOptions_STRUCT_SIZE, pointer(options), 0))
-                CUpti_Profiler_CounterDataImage_CalculateSize(params)
+                    C_NULL, CUpti_Profiler_CounterDataImageOptions_STRUCT_SIZE, 
+                    Base.unsafe_convert(Ptr{CUpti_Profiler_CounterDataImageOptions}, options), 0))
+                cuptiProfilerCounterDataImageCalculateSize(params)
                 sz = params[].CounterDataImageSize
             end 
             images = Vector{UInt8}(undef, sz)
             GC.@preserve options images begin
                 params = Ref(CUpti_Profiler_CounterDataImage_Initialize_Params(
                     CUpti_Profiler_CounterDataImage_Initialize_Params_STRUCT_SIZE,
-                    C_NULL, CUpti_Profiler_CounterDataImageOptions_STRUCT_SIZE, pointer(options),
+                    C_NULL, CUpti_Profiler_CounterDataImageOptions_STRUCT_SIZE, 
+                    Base.unsafe_convert(Ptr{CUpti_Profiler_CounterDataImageOptions}, options),
                     sz, pointer(images)))
-                CUpti_Profiler_CounterDataImage_Initialize(params)
+                cuptiProfilerCounterDataImageInitialize(params)
             end
         end
 
@@ -80,7 +81,7 @@ module CUPTIExt
             params = Ref(CUpti_Profiler_CounterDataImage_CalculateScratchBufferSize_Params(
                 CUpti_Profiler_CounterDataImage_CalculateScratchBufferSize_Params_STRUCT_SIZE,
                 C_NULL, sz, pointer(images),0))
-            CUpti_Profiler_CounterDataImage_CalculateScratchBufferSize(params)
+            cuptiProfilerCounterDataImageCalculateScratchBufferSize(params)
             scratch_sz = params[].counterDataScratchBufferSize
         end
         scratch = Vector{UInt8}(undef, scratch_sz)
@@ -88,7 +89,7 @@ module CUPTIExt
             params = Ref(CUpti_Profiler_CounterDataImage_InitializeScratchBuffer_Params(
                 CUpti_Profiler_CounterDataImage_InitializeScratchBuffer_Params_STRUCT_SIZE,
                 C_NULL, sz, pointer(images),scratch_sz, pointer(scratch)))
-            CUpti_Profiler_CounterDataImage_InitializeScratchBuffer(params)
+            cuptiProfilerCounterDataImageInitializeScratchBufferSize(params)
         end
 
         return CounterData(images, scratch)
