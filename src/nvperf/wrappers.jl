@@ -253,16 +253,21 @@ mutable struct CUDARawMetricsConfig <: RawMetricsConfig
             NVPW_CUDA_RawMetricsConfig_Create_V2(params)
             this = new(params[].pRawMetricsConfig)
         end
-        finalizer(this) do this
-            params = Ref(NVPW_RawMetricsConfig_Destroy_Params(
-                NVPW_RawMetricsConfig_Destroy_Params_STRUCT_SIZE,
-                C_NULL, this.handle))
-            NVPW_RawMetricsConfig_Destroy(params)
-        end
+        finalizer(destroy, this)
         return this
     end
 end
 Base.unsafe_convert(::Type{Ptr{NVPA_RawMetricsConfig}}, config::CUDARawMetricsConfig) = config.handle
+
+function destroy(rmc::RawMetricsConfig)
+    GC.@preserve rmc begin
+        params = Ref(NVPW_RawMetricsConfig_Destroy_Params(
+            NVPW_RawMetricsConfig_Destroy_Params_STRUCT_SIZE,
+            C_NULL, Base.unsafe_convert(Ptr{NVPA_RawMetricsConfig}, rmc)))
+        NVPW_RawMetricsConfig_Destroy(params)
+    end
+    return nothing
+end
 
 function begin_config_group(config::RawMetricsConfig, maxPassCount)
     GC.@preserve config begin
@@ -335,17 +340,22 @@ mutable struct CUDACounterDataBuilder <: CounterDataBuilder
             NVPW_CUDA_CounterDataBuilder_Create(params)
             this = new(params[].pCounterDataBuilder)
         end
-        finalizer(this) do this
-            params = Ref(NVPW_CounterDataBuilder_Destroy_Params(
-                NVPW_CounterDataBuilder_Destroy_Params_STRUCT_SIZE,
-                C_NULL, this.handle))
-            NVPW_CounterDataBuilder_Destroy(params)
-        end
+        finalizer(destroy, this)
         return this
     end
 
 end
 Base.unsafe_convert(::Type{Ptr{NVPA_CounterDataBuilder}}, builder::CUDACounterDataBuilder) = builder.handle
+
+function destroy(builder::CounterDataBuilder)
+    GC.@preserve builder begin
+        params = Ref(NVPW_CounterDataBuilder_Destroy_Params(
+                NVPW_CounterDataBuilder_Destroy_Params_STRUCT_SIZE,
+                C_NULL, Base.unsafe_convert(Ptr{NVPA_CounterDataBuilder}, builder)))
+        NVPW_CounterDataBuilder_Destroy(params)
+    end
+    return nothing
+end
 
 function add!(builder::CounterDataBuilder, metrics::Vector{NVPA_RawMetricRequest})
     GC.@preserve builder metrics begin

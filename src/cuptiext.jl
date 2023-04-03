@@ -64,7 +64,7 @@ module CUPTIExt
                     C_NULL, CUpti_Profiler_CounterDataImageOptions_STRUCT_SIZE, 
                     Base.unsafe_convert(Ptr{CUpti_Profiler_CounterDataImageOptions}, options), 0))
                 cuptiProfilerCounterDataImageCalculateSize(params)
-                sz = params[].CounterDataImageSize
+                sz = params[].counterDataImageSize
             end 
             images = Vector{UInt8}(undef, sz)
             GC.@preserve options images begin
@@ -88,8 +88,8 @@ module CUPTIExt
         GC.@preserve images scratch begin
             params = Ref(CUpti_Profiler_CounterDataImage_InitializeScratchBuffer_Params(
                 CUpti_Profiler_CounterDataImage_InitializeScratchBuffer_Params_STRUCT_SIZE,
-                C_NULL, sz, pointer(images),scratch_sz, pointer(scratch)))
-            cuptiProfilerCounterDataImageInitializeScratchBufferSize(params)
+                C_NULL, sz, pointer(images), scratch_sz, pointer(scratch)))
+            cuptiProfilerCounterDataImageInitializeScratchBuffer(params)
         end
 
         return CounterData(images, scratch)

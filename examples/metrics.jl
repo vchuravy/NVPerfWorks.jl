@@ -33,7 +33,7 @@ builder = NVPERF.CUDACounterDataBuilder(chip, avail)
 NVPERF.add!(builder, raw_metrics)
 prefix = NVPERF.prefix(builder)
 
-counterData = CUPTIExt.CounterData(prefix, 0, 0, 64)
+counterData = CUPTIExt.CounterData(prefix, 1, 1, 64)
 
 # Need counterDataImage
 # then range then 
