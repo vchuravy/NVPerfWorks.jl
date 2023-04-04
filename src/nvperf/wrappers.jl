@@ -128,6 +128,16 @@ function submetrics(me::MetricsEvaluator, type)
     end
 end
 
+function set_device_attributes(me::MetricsEvaluator, data_image)
+    GC.@preserve me data_image begin
+        params = Ref(NVPW_MetricsEvaluator_SetDeviceAttributes_Params(
+            NVPW_MetricsEvaluator_SetDeviceAttributes_Params_STRUCT_SIZE,
+            C_NULL, Base.unsafe_convert(Ptr{NVPW_MetricsEvaluator}, me),
+            pointer(data_image), length(data_image)))
+        NVPW_MetricsEvaluator_SetDeviceAttributes(params)
+    end
+end
+
 # TODO rollup to string
 # TODO submetric to string
 
@@ -149,6 +159,22 @@ struct Metric
             NVPW_MetricsEvaluator_GetMetricTypeAndIndex(params)
             return new(me, NVPW_MetricType(params[].metricType), params[].metricIndex)
         end
+    end
+end
+
+struct DimUnit
+    me::MetricsEvaluator
+    dimUnit::UInt32
+end
+
+function Base.string(u::DimUnit)
+    GC.@preserve u begin
+        params = Ref(NVPW_MetricsEvaluator_DimUnitToString_Params(
+            NVPW_MetricsEvaluator_DimUnitToString_Params_STRUCT_SIZE,
+            C_NULL, Base.unsafe_convert(Ptr{NVPW_MetricsEvaluator}, u.me), u.dimUnit,
+            C_NULL, C_NULL))
+        NVPW_MetricsEvaluator_DimUnitToString(params)
+        return unsafe_string(params[].pSingularName)
     end
 end
 
@@ -215,6 +241,27 @@ end
 mutable struct MetricEvalRequestSet
     me::MetricsEvaluator
     mers::Vector{MetricEvalRequest}
+end
+
+function MetricEvalRequestSet(me::MetricsEvaluator, names::Vector{String})
+    mers = map(name->MetricEvalRequest(me, name), names)
+    MetricEvalRequestSet(me, mers)
+end
+
+function evaluate(mers::MetricEvalRequestSet, data_image, range; isolated=true)
+    metrics = Vector{Float64}(undef, length(mers.mers))
+    GC.@preserve mers data_image metrics begin
+        params = Ref(NVPW_MetricsEvaluator_EvaluateToGpuValues_Params(
+            NVPW_MetricsEvaluator_EvaluateToGpuValues_Params_STRUCT_SIZE,
+            C_NULL, Base.unsafe_convert(Ptr{NVPW_MetricsEvaluator}, mers.me),
+            Base.unsafe_convert(Ptr{NVPW_MetricEvalRequest}, mers.mers), length(mers.mers), 
+            NVPW_MetricEvalRequest_STRUCT_SIZE, sizeof(NVPW_MetricEvalRequest),
+            pointer(data_image), length(data_image),
+            range, isolated, pointer(metrics)
+        ))
+        NVPW_MetricsEvaluator_EvaluateToGpuValues(params)
+    end
+    return metrics
 end
 
 function raw(mers::MetricEvalRequestSet; keepInstances=true, isolated=true)

@@ -13,6 +13,10 @@ a = CUDA.rand(Float32, dims)
 b = CUDA.rand(Float32, dims)
 c = similar(a)
 
+# Warmup
+@cuda threads=prod(dims) vadd(a, b, c)
+CUDA.synchronize()
+
 NVPERF.initialize()
 CUPTIExt.initialize_profiler()
 
@@ -28,8 +32,26 @@ description, unit = NVPERF.properties(m)
 @show description
 @show string(unit)
 
-mer = NVPERF.MetricEvalRequest(me, "dram__bytes.sum.per_second")
-mers = NVPERF.MetricEvalRequestSet(me, [mer])
+mers = NVPERF.MetricEvalRequestSet(me,[
+    "sm__cycles_elapsed.avg",
+    "sm__cycles_elapsed.avg.per_second",
+
+    "dram__bytes.sum",
+    "lts__t_bytes.sum.per_second",
+    "l1tex__t_bytes.sum.per_second",
+
+    "sm__sass_thread_inst_executed_op_fadd_pred_on.sum",
+    "sm__sass_thread_inst_executed_op_fmul_pred_on.sum",
+    "sm__sass_thread_inst_executed_op_ffma_pred_on.sum",
+
+    "sm__sass_thread_inst_executed_op_dadd_pred_on.sum",
+    "sm__sass_thread_inst_executed_op_dmul_pred_on.sum",
+    "sm__sass_thread_inst_executed_op_dfma_pred_on.sum",
+
+    "sm__sass_thread_inst_executed_op_hadd_pred_on.sum",
+    "sm__sass_thread_inst_executed_op_hmul_pred_on.sum",
+    "sm__sass_thread_inst_executed_op_hfma_pred_on.sum",
+])
 raw_metrics = NVPERF.raw(mers)
 
 metricsConfig = NVPERF.CUDARawMetricsConfig(chip, avail)#; activity=NVPERF.NVPA_ACTIVITY_KIND_REALTIME_PROFILER)
@@ -46,25 +68,39 @@ prefix = NVPERF.prefix(builder)
 
 counterData = CUPTIExt.CounterData(prefix, 1, 1, 64)
 
-CUPTIExt.begin_session(counterData, CUPTIExt.CUPTI_UserRange, CUPTIExt.CUPTI_UserReplay)
-CUPTIExt.set_config(image)
+function measure(f, counterData, image)
+    CUPTIExt.begin_session(counterData, CUPTIExt.CUPTI_UserRange, CUPTIExt.CUPTI_UserReplay)
+    CUPTIExt.set_config(image)
+    while true
+        @info "Running pass"
+        CUPTIExt.begin_pass()
+        CUPTIExt.enable_profiling()
+        CUPTIExt.push_range("metrics")
 
-CUPTIExt.begin_pass()
-CUPTIExt.enable_profiling()
-CUPTIExt.push_range("metrics")
+        f()
 
-@cuda threads=prod(dims) vadd(a, b, c)
+        CUPTIExt.pop_range()
+        CUPTIExt.disable_profiling()
+        if CUPTIExt.end_pass()
+            break
+        end
+    end
+    CUPTIExt.flush_counter_data()
+    CUPTIExt.unset_config()
+    CUPTIExt.end_session()
+end
 
-CUPTIExt.pop_range()
-CUPTIExt.disable_profiling()
-@show CUPTIExt.end_pass()
-
-@show CUPTIExt.flush_counter_data()
-CUPTIExt.unset_config()
-CUPTIExt.end_session()
+measure(counterData, image) do
+    @cuda threads=prod(dims) vadd(a, b, c)
+    CUDA.synchronize()
+end
 
 # @show NVPERF.get_num_ranges(image)
 
-meval = NVPERF.CUDAMetricsEvaluator(chip, avail, counterData.image)
+# meval = NVPERF.CUDAMetricsEvaluator(chip, avail, counterData.image)
+NVPERF.set_device_attributes(mers.me, counterData.image)
+measured = NVPERF.evaluate(mers, counterData.image, 0)
+@show measured
+
 
 # TODO Eval
