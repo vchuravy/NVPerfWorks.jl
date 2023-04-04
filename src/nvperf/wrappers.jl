@@ -36,14 +36,22 @@ mutable struct CUDAMetricsEvaluator <: MetricsEvaluator
     availability::Vector{UInt8}
     chip::String
 
-    function CUDAMetricsEvaluator(chip, availability)
+    function CUDAMetricsEvaluator(chip, availability, counterData=nothing)
         scratch = scratch_buffer(chip, availability)
 
-        GC.@preserve chip availability scratch begin
+        GC.@preserve chip availability scratch counterData begin
+            if counterData === nothing
+                pCounterData = C_NULL
+                szCounterData = 0
+            else
+                pCounterData = pointer(counterData)
+                szCounterData = length(counterData)
+            end
+
             params = Ref(NVPW_CUDA_MetricsEvaluator_Initialize_Params(
                 NVPW_CUDA_MetricsEvaluator_Initialize_Params_STRUCT_SIZE,
                 C_NULL, pointer(scratch), length(scratch), pointer(chip),
-                pointer(availability), C_NULL, 0, C_NULL))
+                pointer(availability), pCounterData, szCounterData, C_NULL))
             
             NVPW_CUDA_MetricsEvaluator_Initialize(params)
             this =  new(params[].pMetricsEvaluator, scratch, availability, chip)
@@ -389,4 +397,15 @@ function prefix(builder::CounterDataBuilder)
     return prefix
 end
 
+# TODO: Missing in API ???
+# function get_num_ranges(image)
+#     GC.@preserve image begin
+#         params = Ref(NVPW_CounterData_GetNumRanges_Params(
+#             NVPW_CounterData_GetNumRanges_Params_STRUCT_SIZE,
+#             C_NULL, pointer(image), 0
+#         ))
+#         NVPW_CounterData_GetNumRanges(params)
+#         return params[].numRanges
+#     end
+# end
 
