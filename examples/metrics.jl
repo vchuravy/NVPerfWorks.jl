@@ -37,8 +37,8 @@ mers = NVPERF.MetricEvalRequestSet(me,[
     "sm__cycles_elapsed.avg.per_second",
 
     "dram__bytes.sum",
-    "lts__t_bytes.sum.per_second",
-    "l1tex__t_bytes.sum.per_second",
+    "lts__t_bytes.sum",
+    "l1tex__t_bytes.sum",
 
     "sm__sass_thread_inst_executed_op_fadd_pred_on.sum",
     "sm__sass_thread_inst_executed_op_fmul_pred_on.sum",
