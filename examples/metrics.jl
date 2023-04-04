@@ -54,7 +54,7 @@ mers = NVPERF.MetricEvalRequestSet(me,[
 ])
 raw_metrics = NVPERF.raw(mers)
 
-metricsConfig = NVPERF.CUDARawMetricsConfig(chip, avail)#; activity=NVPERF.NVPA_ACTIVITY_KIND_REALTIME_PROFILER)
+metricsConfig = NVPERF.CUDARawMetricsConfig(chip, avail; activity=NVPERF.NVPA_ACTIVITY_KIND_REALTIME_PROFILER)
 NVPERF.begin_config_group(metricsConfig, 1)
 NVPERF.add!(metricsConfig, raw_metrics)
 NVPERF.end_config_group(metricsConfig)
