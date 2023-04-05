@@ -162,16 +162,16 @@ struct Metric
     end
 end
 
-struct DimUnit
+struct DimUnitSet
     me::MetricsEvaluator
-    dimUnit::UInt32
+    units::Vector{NVPW_DimUnitFactor}
 end
 
-function Base.string(u::DimUnit)
-    GC.@preserve u begin
+function to_string(me::MetricsEvaluator, u::NVPW_DimUnitFactor)
+    GC.@preserve me u begin
         params = Ref(NVPW_MetricsEvaluator_DimUnitToString_Params(
             NVPW_MetricsEvaluator_DimUnitToString_Params_STRUCT_SIZE,
-            C_NULL, Base.unsafe_convert(Ptr{NVPW_MetricsEvaluator}, u.me), u.dimUnit,
+            C_NULL, Base.unsafe_convert(Ptr{NVPW_MetricsEvaluator}, me), u.dimUnit,
             C_NULL, C_NULL))
         NVPW_MetricsEvaluator_DimUnitToString(params)
         return unsafe_string(params[].pSingularName)
@@ -238,6 +238,31 @@ struct MetricEvalRequest
     end
 end
 
+function units(me::MetricsEvaluator, mer::MetricEvalRequest)
+    p_mer = Ref(mer.data)
+    GC.@preserve me p_mer begin
+        params = Ref(NVPW_MetricsEvaluator_GetMetricDimUnits_Params(
+            NVPW_MetricsEvaluator_GetMetricDimUnits_Params_STRUCT_SIZE,
+            C_NULL, Base.unsafe_convert(Ptr{NVPW_MetricsEvaluator}, me), 
+            Base.unsafe_convert(Ptr{NVPW_MetricEvalRequest}, p_mer),
+            NVPW_MetricEvalRequest_STRUCT_SIZE,
+            C_NULL, 0, NVPW_DimUnitFactor_STRUCT_SIZE))
+        NVPW_MetricsEvaluator_GetMetricDimUnits(params)
+        sz = params[].numDimUnits
+    end
+    units = Vector{NVPW_DimUnitFactor}(undef, sz)
+    GC.@preserve me p_mer units begin
+        params = Ref(NVPW_MetricsEvaluator_GetMetricDimUnits_Params(
+            NVPW_MetricsEvaluator_GetMetricDimUnits_Params_STRUCT_SIZE,
+            C_NULL, Base.unsafe_convert(Ptr{NVPW_MetricsEvaluator}, me), 
+            Base.unsafe_convert(Ptr{NVPW_MetricEvalRequest}, p_mer),
+            NVPW_MetricEvalRequest_STRUCT_SIZE,
+            pointer(units), length(units), NVPW_DimUnitFactor_STRUCT_SIZE))
+        NVPW_MetricsEvaluator_GetMetricDimUnits(params)
+    end
+    return DimUnitSet(me, units)
+end
+
 mutable struct MetricEvalRequestSet
     me::MetricsEvaluator
     mers::Vector{MetricEvalRequest}
@@ -262,6 +287,37 @@ function evaluate(mers::MetricEvalRequestSet, data_image, range; isolated=true)
         NVPW_MetricsEvaluator_EvaluateToGpuValues(params)
     end
     return metrics
+end
+
+function to_unitful(me, u::NVPW_DimUnitFactor)
+    ustring = to_string(me, u)
+    if ustring == "gpc_cycle"
+        1u"Cycle"^u.exponent
+    elseif ustring  == "byte"
+        1u"Byte"^u.exponent
+    elseif ustring == "instruction"
+        1u"Ins"^u.exponent
+    elseif ustring == "second"
+        1u"s"^u.exponent
+    else
+        error("$ustring not implemented")
+    end
+end
+
+function units(mers::MetricEvalRequestSet)
+    sets = map(mer->units(mers.me, mer), mers.mers)
+
+    map(sets) do set
+        l = length(set.units)
+        if l == 1
+            u = only(set.units)
+            return to_unitful(mers.me, u)
+        elseif l == 2
+            return to_unitful(mers.me, set.units[1]) * to_unitful(mers.me, set.units[2])
+        else
+            error("Unexpected $l")
+        end
+    end
 end
 
 function raw(mers::MetricEvalRequestSet; keepInstances=true, isolated=true)

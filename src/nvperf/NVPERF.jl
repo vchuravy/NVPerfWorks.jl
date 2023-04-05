@@ -1,5 +1,8 @@
 module NVPERF
 
+using Unitful
+using ..Units
+
 using ..APIUtils
 
 using ..CUDA_Runtime

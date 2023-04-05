@@ -3,6 +3,27 @@ module NVPerfWorks
 using CUDA
 import CUDA: APIUtils, CUDA_Runtime
 
+module Units
+    using Unitful
+
+    @dimension Ι "Ι" Instruction
+    @refunit Ins "Instruction" Instruction Ι true
+
+    @dimension CC "CycleDim" CycleDim
+    @refunit Cycle "Cycle" Cycle CC false
+
+    @dimension II "Information" Information
+    @refunit Byte "Byte" Byte II true
+
+    # TODO: KiB
+
+    Unitful.register(@__MODULE__);
+end
+
+import .Units
+
+using Unitful
+
 include("cuptiext.jl")
 include("nvperf/NVPERF.jl")
 
@@ -12,6 +33,8 @@ mutable struct StatefulMeasure
     mers::NVPERF.MetricEvalRequestSet
     image::Vector{UInt8}
     counterData::CUPTIExt.CounterData
+    units
+    metrics::Vector{String}
     running::Bool
     sessions::Int64
     passes::Int64
@@ -27,6 +50,7 @@ function StatefulMeasure(metrics)
     me = NVPERF.CUDAMetricsEvaluator(chip, avail)
 
     mers = NVPERF.MetricEvalRequestSet(me, metrics)
+    units = NVPERF.units(mers)
     raw_metrics = NVPERF.raw(mers)
 
     metricsConfig = NVPERF.CUDARawMetricsConfig(chip, avail; activity=NVPERF.NVPA_ACTIVITY_KIND_REALTIME_PROFILER)
@@ -42,7 +66,7 @@ function StatefulMeasure(metrics)
     prefix = NVPERF.prefix(builder)
 
     counterData = CUPTIExt.CounterData(prefix, 1, 1, 64)
-    return StatefulMeasure(mers, image, counterData, false, 0, 0)
+    return StatefulMeasure(mers, image, counterData, units, metrics, false, 0, 0)
 end
 
 function start!(measure::StatefulMeasure)
@@ -72,7 +96,8 @@ function stop!(measure::StatefulMeasure)
         CUPTIExt.end_session()
 
         NVPERF.set_device_attributes(measure.mers.me, measure.counterData.image)
-        return NVPERF.evaluate(measure.mers, measure.counterData.image, 0)
+        measured_metrics = NVPERF.evaluate(measure.mers, measure.counterData.image, 0)
+        return Dict(m => val*u for (val, m, u) in zip(measured_metrics, measure.metrics, measure.units))
     end
     return nothing
 end
