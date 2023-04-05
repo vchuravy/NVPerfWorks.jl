@@ -296,7 +296,7 @@ function to_unitful(me, u::NVPW_DimUnitFactor)
     elseif ustring  == "byte"
         1u"Byte"^u.exponent
     elseif ustring == "instruction"
-        1u"Ins"^u.exponent
+        1u"Instruction"^u.exponent
     elseif ustring == "second"
         1u"s"^u.exponent
     else

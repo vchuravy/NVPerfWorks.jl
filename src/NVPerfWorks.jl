@@ -5,15 +5,13 @@ import CUDA: APIUtils, CUDA_Runtime
 
 module Units
     using Unitful
+    using Unitful.DefaultSymbols
 
-    @dimension Ι "Ι" Instruction
-    @refunit Ins "Instruction" Instruction Ι true
+    @refunit Instruction "Instruction" Instruction 𝐍 true
+    @refunit Cycle "Cycle" Cycle 𝐍 false
+    @refunit Byte "Byte" Byte 𝐍 true
 
-    @dimension CC "CycleDim" CycleDim
-    @refunit Cycle "Cycle" Cycle CC false
-
-    @dimension II "Information" Information
-    @refunit Byte "Byte" Byte II true
+    @unit IPC "IPC" InstructionsPerCycle 1Instruction/Cycle false
 
     # TODO: KiB
 
