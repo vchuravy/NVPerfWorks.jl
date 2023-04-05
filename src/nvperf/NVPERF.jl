@@ -1,6 +1,11 @@
 module NVPERF
 
 using Unitful
+using Unitful.DefaultSymbols
+import Unitful: percent
+
+import Base: GC
+
 using ..Units
 
 using ..APIUtils

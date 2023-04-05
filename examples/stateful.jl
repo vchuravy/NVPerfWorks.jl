@@ -17,6 +17,14 @@ metrics = [
     "sm__sass_thread_inst_executed_op_hadd_pred_on.sum",
     "sm__sass_thread_inst_executed_op_hmul_pred_on.sum",
     "sm__sass_thread_inst_executed_op_hfma_pred_on.sum",
+
+    "smsp__sass_thread_inst_executed_ops_dadd_dmul_dfma_pred_on.avg.pct_of_peak_sustained_elapsed",
+    "smsp__sass_thread_inst_executed_ops_fadd_fmul_ffma_pred_on.avg.pct_of_peak_sustained_elapsed",
+    "smsp__sass_thread_inst_executed_ops_hadd_hmul_hfma_pred_on.avg.pct_of_peak_sustained_elapsed",
+
+    "smsp__sass_thread_inst_executed_ops_dadd_dmul_dfma_pred_on.max.pct_of_peak_sustained_elapsed",
+    "smsp__sass_thread_inst_executed_ops_fadd_fmul_ffma_pred_on.max.pct_of_peak_sustained_elapsed",
+    "smsp__sass_thread_inst_executed_ops_hadd_hmul_hfma_pred_on.max.pct_of_peak_sustained_elapsed",
 ]
 
 using CUDA
@@ -73,11 +81,20 @@ function process(metrics)
     H_FLOPs = H_FLOP/time
     F_FLOPs = F_FLOP/time
 
-    @info "Fraction active"  fraction = measure.passes/measure.sessions
+    AVG_PCT_OF_PEAK_D = metrics["smsp__sass_thread_inst_executed_ops_dadd_dmul_dfma_pred_on.avg.pct_of_peak_sustained_elapsed"]
+    AVG_PCT_OF_PEAK_F = metrics["smsp__sass_thread_inst_executed_ops_fadd_fmul_ffma_pred_on.avg.pct_of_peak_sustained_elapsed"]
+    AVG_PCT_OF_PEAK_H = metrics["smsp__sass_thread_inst_executed_ops_hadd_hmul_hfma_pred_on.avg.pct_of_peak_sustained_elapsed"]
+
+    MAX_PCT_OF_PEAK_D = metrics["smsp__sass_thread_inst_executed_ops_dadd_dmul_dfma_pred_on.max.pct_of_peak_sustained_elapsed"]
+    MAX_PCT_OF_PEAK_F = metrics["smsp__sass_thread_inst_executed_ops_fadd_fmul_ffma_pred_on.max.pct_of_peak_sustained_elapsed"]
+    MAX_PCT_OF_PEAK_H = metrics["smsp__sass_thread_inst_executed_ops_hadd_hmul_hfma_pred_on.max.pct_of_peak_sustained_elapsed"]
+
     @info "Kernel performance" time D_FLOP F_FLOP H_FLOP D_FLOPs F_FLOPs H_FLOPs
     @info "Arithmetic intensity (DRAM)" AI_D_DRAM AI_F_DRAM AI_H_DRAM
     @info "Arithmetic intensity (L2)" AI_D_L2 AI_F_L2 AI_H_L2
     @info "Arithmetic intensity (L1)" AI_D_L1 AI_F_L1 AI_H_L1
+    @info "Average of Peak" AVG_PCT_OF_PEAK_D AVG_PCT_OF_PEAK_F AVG_PCT_OF_PEAK_H
+    @info "Max of Peak" MAX_PCT_OF_PEAK_D MAX_PCT_OF_PEAK_F MAX_PCT_OF_PEAK_H
 end
 
 measure = NVPerfWorks.StatefulMeasure(metrics)
@@ -88,5 +105,6 @@ for i in 1:10
     if measured_metrics === nothing
         continue
     end
+    @info "Fraction active"  fraction = measure.passes/measure.sessions
     process(measured_metrics)
 end

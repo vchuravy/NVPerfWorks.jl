@@ -299,6 +299,8 @@ function to_unitful(me, u::NVPW_DimUnitFactor)
         1u"Instruction"^u.exponent
     elseif ustring == "second"
         1u"s"^u.exponent
+    elseif ustring == "percent"
+        1percent^u.exponent
     else
         error("$ustring not implemented")
     end
